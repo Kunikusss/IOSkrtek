@@ -1,0 +1,254 @@
+#!/bin/bash
+# xslani12 Jakub Slanina
+# 19.3.2023
+
+export POSIXLY_CORRECT=yes
+export LC_ALL=C
+#export MOLE_RC=$HOME/.config/molerc
+
+ if [ -f "$HOME/.config/molerc" ]
+  then
+    echo "file exists"
+  else
+    touch "MOLE_RC"
+    echo "/" > "$MOLE_RC" 
+ fi
+
+
+
+
+ molercNAT=$(cat "$MOLE_RC")
+ list="list"
+ GROUP="-"
+ for last; do LastArg="$last"; done 
+ 
+
+
+  filterFiles(){
+   if [ "$gFlag" = "1" ] 
+	then
+
+	GROUPZ=$(echo "$GROUP" | sed 's/,/\n/g')
+	echo "$GROUPZ"
+
+      for group in $GROUPZ
+       do
+		molerc_tmp=$(echo "$molercNAT" | awk '{if ($3 == "'$group'") print}')
+		molerc="$molerc"$'\n'"$molerc_tmp"
+	   done
+
+	   molerc=$(echo "$molerc" | sort -r -k 2)
+	   echo "$molerc"
+	else
+	  molerc=$(cat "$MOLE_RC")
+   fi
+
+   if [ "$aFlag" = "1" ]
+	then
+	 molerc=$(echo "$molerc" | awk '{if ($2 >= "'$DATEa'") print}')
+   fi
+
+   if [ "$bFlag" = "1" ]
+	then
+	 molerc=$(echo "$molerc" | awk '{if ("'$DATEb'" >= $2) print}')
+   fi
+  }
+
+
+  logSecret(){
+	for secretOutput in ${1%$'\n'};
+       do
+		secretLog=$(echo "$molerc" | grep "$secretOutput" | grep -v  "$secretOutput.*\/" | awk '{print $1 ";" $2}' | sort )
+		secretLogOutputTmp=$(echo "$secretLog" | awk -F';' '{a[$1]=a[$1]";"$2} END {for (i in a) print i ";" substr(a[i], 2)}' | sort -t: -k1)
+		secretLogOutput="$secretLogOutput"$'\n'"$secretLogOutputTmp"
+      done
+	secretLogOutput=$(echo "$secretLogOutput" | grep -v '^;$' | sort -r -k 2 )
+	if [ ! -d "$HOME/.mole" ]
+		then
+		  mkdir $HOME/.mole
+	fi
+
+	echo "$secretLogOutput" > $HOME/.mole/log_"$USER"_"$(date '+%Y-%m-%d_%H-%M-%S')" | bzip2 $HOME/.mole/log_"$USER"_"$(date '+%Y-%m-%d_%H-%M-%S')"
+ 	exit
+
+  }
+
+
+  listFiles(){
+   groups=$(echo "$molerc" | grep "${1}" | grep -v  "${1}.*\/" | awk '{ n=split($1,a,"/"); print a[n] ":" $3}' | sort | uniq )
+   output=$(echo "$groups" | awk -F: '{a[$1]=a[$1]","$2} END {for (i in a) if (a[i] == ",-") print i ": -"; else if (a[i] !~ /^,-/) print i ":" substr(a[i], 2); else print i ":" substr(a[i], 3)}' | sort -t: -k1)
+   output=$(echo "$output" | sed 's/:\s*,/:/' )
+   echo "$output"
+   exit
+  exit
+  }
+
+
+  searchLastUsed(){
+   while read -r line
+    do
+    LastUsed=$(echo "$line" | awk '{sub("/[^/]*$", ""); print $1}' )
+	File=$(echo "$line" | awk '{print $1}')
+     if [ "${1%?}" = "$LastUsed" ] && [ -f "$File" ]
+		then
+	 		return 
+	 fi
+      done <<-EOF
+      $molerc
+	EOF
+   echo "ERROR: No suitable file was found."
+   exit 1
+  }
+
+  searchMostUsed(){
+   SearchedFiles=$(echo "$molerc" | grep "${1}" | awk '{print $1}' | sort | uniq -c)
+   MaxCount=0
+   while read -r line
+    do
+  	file=$(echo "$line" | awk '{print $2}')
+	Count=$(echo "$line" | awk '{print $1}')
+	Count=$((Count+1))
+	if [ "${file#${1}}" != "$file" ] && [ "$Count" -gt "$MaxCount" ]
+  	 then
+    	  File="$file"
+    	  MaxCount=$Count
+  	fi
+      done <<-EOF
+      $SearchedFiles
+	EOF
+  } 
+
+
+ if [ "${1}" = "secret-log" ]
+ then 
+  secretFlag=1
+  shift
+ fi
+
+ if [ "${1}" = "$list" ]
+ then
+  listFlag=1
+  shift
+ fi
+
+ while getopts ":hg:ma:b:*" arg; do
+	GROUPidx=$((GROUPidx+1))
+
+	case "$arg" in
+
+      	h)
+		echo "Usage: mole [arguments]				edit last edited file of file based on arguments in current dictionary" 
+		echo "   or: mole [arguments] [file]			edit chosen file"
+		echo "   or: mole [filters] [dictionary]		edit most frequently edited file or file based on filters"
+		echo "   or: mole list [filters] [dictionary]		list all files or files based on filters"
+		echo ""
+		echo "Arguments:"
+		echo "  -g		If used with a file deisred group will be logged. Otherwise works as filter"
+		echo "  -m		Opens the most edited file if dictionary is selected"
+		echo "  -a"
+		echo "  -b"
+		echo "  -h		Shows the help page."
+		exit
+		;;
+	g)
+		#GROUP="${!OPTIND}"
+		GROUP=$OPTARG
+		echo "$GROUP"
+		gFlag=1
+		;;
+	m)
+		echo "Most edited"
+		mFlag=1;
+		;;
+	a)
+		#spodni hranice
+		echo "Datea"
+		DATEa=$OPTARG
+		aFlag=1;
+		;;
+	b)
+	    #vrchni hranic
+		echo "Dateb"
+		DATEb=$OPTARG
+		bFlag=1;
+		;;
+	*)
+		echo "Invalid argument: -$OPTARG or the argument was used incorrectly use mole -h to see the correct syntax" >&2
+		exit
+ 		;;
+ esac
+done
+
+
+if [ "$GROUP" = "$LastArg" ] || [ "$DATEa" = "$LastArg" ] || [ "$DATEb" = "$LastArg" ]
+then
+ LastArg=""
+fi
+
+echo "$LastArg" 
+if [ "${#}" != "0" ] && ([ -f "$LastArg" ] || [ -d "$LastArg" ]) && [ "$LastArg" != "$list" ] && [ "$LastArg" != "secret-log" ]
+then
+	
+	if [ -d "$LastArg" ]
+	 then
+
+	 filterFiles
+	 if [ "$listFlag" = "1" ]
+	  then
+	   listFiles "$LastArg/"
+	 fi
+
+	 if [ "$secretFlag" = "1" ] 
+	  then
+	   for arg in "$@"; do
+  		if [ -d "$arg" ]; then
+    		SecretDirectories="$SecretDirectories"$'\n'"$arg/"
+  		else
+    		break
+  		fi
+	  done
+	    logSecret "$SecretDirectories"
+	 fi
+
+	   case "$mFlag" in
+		1) searchMostUsed "$LastArg/" ;;
+		*) searchLastUsed "$LastArg/" ;;
+	   esac 
+	  ${VISUAL:-${EDITOR:-vi}} "$File"
+	  sed  -i "1i $File $(date '+%Y-%m-%d_%H-%M-%S') -" "$MOLE_RC"
+
+
+	elif [ -f "$LastArg" ]
+	 then
+	 ${VISUAL:-${EDITOR:-vi}} "$LastArg"
+	 sed  -i -e "1i $LastArg $(date '+%Y-%m-%d_%H-%M-%S') $GROUP" "$MOLE_RC"
+	fi
+
+	
+ else
+    echo "File or Dictionary not set"
+	filterFiles
+  	if [ "$listFlag" = "1" ] 
+	then
+	   listFiles "$(pwd)/"
+	fi
+
+	
+	if [ "$secretFlag" = "1" ] 
+	  then
+	    logSecret "$(pwd)/"
+	 fi
+
+	
+   
+  	 case "$mFlag" in
+		1) searchMostUsed "$(pwd)/" ;;
+		*) searchLastUsed "$(pwd)/" ;;
+	 esac
+  ${VISUAL:-${EDITOR:-vi}} "$File"
+  sed  -i -e "1i $File $(date '+%Y-%m-%d_%H-%M-%S') -" "$MOLE_RC"
+ fi
+
+
+
+
