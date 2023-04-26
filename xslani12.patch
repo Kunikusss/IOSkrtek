@@ -1,0 +1,32 @@
+--- mole.odevzdany	2023-04-26 09:23:51.720874099 +0200
++++ mole	2023-04-26 09:25:40.438839334 +0200
+@@ -13,16 +13,16 @@
+    exit 1
+  fi
+ 
+- if [ ! -d "$HOME/.config" ]
++ if [ ! -d ""$(dirname "${MOLE_RC}")"" ]
+ 	then
+ 	#echo "Creating .config/ folder for the user $USER"
+-	  mkdir "$HOME/.config"
++	  mkdir -p "$(dirname "${MOLE_RC}")"
+  fi
+ 
+- if [ ! -f "$HOME/.config/molerc" ]
++ if [ ! -f "$MOLE_RC" ]
+   then
+     #echo "Creating molerc file for the user $USER"
+-    touch "MOLE_RC"
++    touch "$MOLE_RC"
+     echo "/" > "$MOLE_RC"
+  fi
+ 
+@@ -171,7 +171,7 @@
+ 	g)
+ 		#GROUP="${!OPTIND}"
+ 		GROUP=$OPTARG
+-		echo "$GROUP"
++
+ 		gFlag=1
+ 		;;
+ 	m)
